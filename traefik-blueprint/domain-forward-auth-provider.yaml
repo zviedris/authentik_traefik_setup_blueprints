@@ -1,0 +1,56 @@
+version: 1  # 
+
+metadata:
+  name: "domain-forward-auth-with-searched-flow"
+  labels:
+    purpose: "forward-auth-domain-level"
+
+entries:
+  - model: "authentik_providers_proxy.proxyprovider"
+    identifiers:
+      name: "traefik-forward-domain"
+    state: "present"
+    attrs:
+      name: "Traefik Forward Auth (Domain)"
+      access_token_validity: hours=24
+      #This is domain level forward auth not a single app
+      mode: "forward_domain" 
+      #find default app
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]] 
+      #change to your authentification url
+      authentification_url: "https://auth.localdev.me"
+      #change to your domain
+      cookie_domain: "localdev.me"
+      #should be same as authentification url
+      external_host: "https://auth.localdev.me"
+      token_validity: "hours=24"
+      intercept_header_auth: true
+      internal_host_ssl_validation: true
+      refresh_token_validity: "days=30"
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      #change to your domain
+      redirect_uris:
+      - matching_mode: "strict"
+        url: "https://auth.localdev.me/outpost.goauthentik.io/callback?X-authentik-auth-callback=true"
+      - matching_mode: "strict"
+        url: "https://auth.localdev.me?X-authentik-auth-callback=true"
+  - model: "authentik_core.application"
+    state: "present"
+    identifiers:
+      name: "traefik-forward-domain-application"
+    attrs:
+      name: "Forward Auth"
+      policy_engine_mode: "any"
+      provider: !Find [authentik_providers_proxy.proxyprovider, [name, traefik-forward-domain]]
+      slug: "traefik-forward-auth"
+    conditions: []
+    permissions: []
+  # Adds the my-app application to the embedded outpost  
+  - identifiers: 
+      pk: !Find [ authentik_outposts.outpost, [name, authentik Embedded Outpost]] 
+    model: authentik_outposts.outpost   
+    attrs:  
+      providers: [!Find [authentik_providers_proxy.proxyprovider, [name, traefik-forward-domain]]]
+      config:
+        #add your authentification url
+        authentik_host: "https://auth.localdev.me"
